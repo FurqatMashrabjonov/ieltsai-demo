@@ -122,7 +122,7 @@ export function useAltairAI() {
   // Step 1: Configure AI model and system instruction
   useEffect(() => {
     console.log("[ALTAIR] Configuring AI model and system instruction")
-    setModel("gemini-2.5-flash-native-audio-preview-09-2025")
+    setModel("models/gemini-2.0-flash-exp")
     setConfig({
       responseModalities: [Modality.AUDIO],
       speechConfig: {
