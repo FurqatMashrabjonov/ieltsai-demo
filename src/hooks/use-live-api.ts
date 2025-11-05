@@ -101,6 +101,9 @@ export function useLiveAPI(options: LiveClientOptions): UseLiveAPIResults {
     }
     client.disconnect();
     await client.connect(model, config);
+      client.send([{
+          text: "Hello, I'm ready to begin the IELTS speaking test. Please start speaking."
+      }]);
   }, [client, config, model]);
 
   const disconnect = useCallback(async () => {

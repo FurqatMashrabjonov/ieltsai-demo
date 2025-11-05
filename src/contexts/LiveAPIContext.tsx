@@ -15,8 +15,8 @@
  */
 
 import { createContext, FC, ReactNode, useContext } from "react";
-import { useLiveAPI, UseLiveAPIResults } from "../hooks/use-live-api";
-import { LiveClientOptions } from "../types";
+import { useLiveAPI, UseLiveAPIResults } from "@/hooks/use-live-api";
+import { LiveClientOptions } from "@/types";
 
 const LiveAPIContext = createContext<UseLiveAPIResults | undefined>(undefined);
 

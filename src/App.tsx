@@ -15,8 +15,8 @@
  */
 
 import "./App.scss";
-import { LiveAPIProvider } from "./contexts/LiveAPIContext";
-import { ChatLayout } from "./components/chat-layout/ChatLayout";
+import { LiveAPIProvider } from "@/contexts/LiveAPIContext";
+import { ChatLayout } from "@/components/chat-layout/ChatLayout";
 import { LiveClientOptions } from "./types";
 
 const API_KEY = process.env.REACT_APP_GEMINI_API_KEY as string;

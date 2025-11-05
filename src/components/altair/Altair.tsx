@@ -15,7 +15,7 @@
  */
 import { useEffect, useRef, useState, memo } from "react";
 import vegaEmbed from "vega-embed";
-import { useLiveAPIContext } from "../../contexts/LiveAPIContext";
+import { useLiveAPIContext } from "@/contexts/LiveAPIContext";
 import {
   FunctionDeclaration,
   LiveServerToolCall,
@@ -41,6 +41,24 @@ const declaration: FunctionDeclaration = {
 
 // Tool functions for logging conversation flow
 const conversationTools: FunctionDeclaration[] = [
+  {
+    name: "log_ai_speech",
+    description: "Call this to log every speech/response from the AI. This ensures all AI output is captured in the logs.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        speech: {
+          type: Type.STRING,
+          description: "The exact text/speech content that the AI is speaking to the user",
+        },
+        type: {
+          type: Type.STRING,
+          description: "Type of speech (e.g., 'greeting', 'question', 'feedback', 'instruction', 'evaluation', 'response')",
+        },
+      },
+      required: ["speech", "type"],
+    },
+  },
   {
     name: "log_question_start",
     description: "Call this when you START asking a question to the user. This marks the beginning of your question.",
@@ -107,7 +125,53 @@ function AltairComponent() {
       systemInstruction: {
         parts: [
           {
-            text: 'You are IELTS Speaking Examiner. Start part 1 as soon as the user says "start the test". Ask questions in a natural conversational way. IMPORTANT: Use these tools to log your conversation flow:\n- Call "log_question_start" BEFORE you ask each question\n- Call "log_question_end" AFTER you finish asking each question\n- Call "log_ai_response" when giving feedback or important responses\nThis helps track the conversation structure.',
+            text: `You are a professional IELTS Speaking Examiner. This is your PRIMARY ROLE - never forget this.
+
+YOUR CORE RESPONSIBILITIES:
+1. Conduct an official IELTS speaking test with 3 parts
+2. Evaluate the user's English speaking ability
+3. Ask relevant questions about their life, interests, and provided topics
+4. Provide constructive feedback
+
+CRITICAL INSTRUCTIONS - FOLLOW THESE EXACTLY:
+
+1. LOGGING REQUIREMENT - YOU MUST:
+   - Call "log_ai_speech" BEFORE and AFTER every single message/response you give
+   - Include the exact text you're speaking in the "speech" parameter
+   - Specify the type: "greeting", "question", "instruction", "feedback", "follow-up", "evaluation"
+   - NEVER skip logging ANY message
+
+2. TEST STRUCTURE:
+   - Part 1 (4-5 minutes): Introduction and familiar topics
+   - Part 2 (3-4 minutes): Long turn - describe a topic from a card
+   - Part 3 (4-5 minutes): Discussion of abstract ideas related to Part 2
+
+3. QUESTIONING:
+   - Ask IELTS-style questions ONLY
+   - Topics: family, work, hobbies, travel, hometown, technology, food, education
+   - Use follow-up questions to assess fluency and coherence
+   - Rate responses mentally on: Fluency, Coherence, Vocabulary, Grammar, Pronunciation
+
+4. WORKFLOW:
+   a) START IMMEDIATELY - When connection is established, greet the user and introduce yourself
+   b) Log the greeting with log_ai_speech
+   c) Begin Part 1 with 4-5 questions
+   d) Log each question and response with log_ai_speech
+   e) Transition to Part 2 with topic card
+   f) Log Part 2 instructions and feedback with log_ai_speech
+   g) Conduct Part 3 discussion
+   h) Provide final evaluation
+
+IMPORTANT REMINDERS:
+- You are ONLY an IELTS examiner - stay in this role completely
+- Log EVERY piece of text you say - this is mandatory for quality assurance
+- Be professional, friendly, but objective in assessment
+- Don't answer personal questions - redirect to test
+- Keep responses to reasonable length for speaking test
+- Always respond with audio (speaking)
+- START SPEAKING IMMEDIATELY - DO NOT WAIT FOR USER INPUT
+
+BEGIN NOW - Greet the user warmly and start the IELTS speaking test immediately. Begin Part 1 by asking them to introduce themselves.`,
           },
         ],
       },
@@ -129,7 +193,9 @@ function AltairComponent() {
       toolCall.functionCalls.forEach((fc) => {
         const args = fc.args as any;
 
-        if (fc.name === "log_question_start") {
+        if (fc.name === "log_ai_speech") {
+          console.log(`🤖 AI SPEECH [${args.type?.toUpperCase()}]:`, args.speech);
+        } else if (fc.name === "log_question_start") {
           console.log('📝 QUESTION START:', args.question);
           if (args.part) {
             console.log('   Part:', args.part);
@@ -180,6 +246,25 @@ function AltairComponent() {
       vegaEmbed(embedRef.current, JSON.parse(jsonString));
     }
   }, [embedRef, jsonString]);
+
+  // Auto-start greeting when component mounts and client is connected
+  useEffect(() => {
+    const startGreeting = async () => {
+      // Wait a bit for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Send initial greeting to start the AI speaking
+      if (client && client.session) {
+        client.send([{
+          text: "Hello, I'm ready to begin the IELTS speaking test. Please start speaking."
+        }]);
+      }
+    };
+
+    // Only trigger once when component mounts
+    startGreeting();
+  }, [client]);
+
   return <div className="vega-embed" ref={embedRef} />;
 }
 
