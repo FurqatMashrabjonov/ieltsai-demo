@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react"
-import { useLiveAPIContext } from "@/contexts/LiveAPIContext" //../../contexts/LiveAPIContext
-import { useLoggerStore } from "@/lib/store-logger"
+import { useLiveAPIContext } from "../../contexts/LiveAPIContext"
+import { useLoggerStore } from "../../lib/store-logger"
+import { useAltairAI } from "../altair/Altair"
 import { Sidebar, SidebarContent, SidebarItem } from "../ui/sidebar"
 import { Button } from "../ui/button"
 import { Textarea } from "../ui/textarea"
 import { LogsViewer } from "../logs-viewer/LogsViewer"
 import { Plus, Settings, LogOut, Menu, X, Mic, MicOff, Send } from "lucide-react"
-import { cn } from "@/lib/utils-cn"
+import { cn } from "../../lib/utils-cn"
 
 interface Message {
   id: string
@@ -19,6 +20,9 @@ export function ChatLayout() {
   const { client, connected, connect, disconnect, volume } =
     useLiveAPIContext()
   const { log } = useLoggerStore()
+
+  // Initialize AI configuration and handlers
+  useAltairAI()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [textInput, setTextInput] = useState("")

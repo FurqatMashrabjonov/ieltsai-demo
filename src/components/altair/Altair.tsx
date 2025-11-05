@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useEffect, useRef, useState, memo } from "react";
-import vegaEmbed from "vega-embed";
-import { useLiveAPIContext } from "@/contexts/LiveAPIContext";
+import { useEffect, useState } from "react"
+import { useLiveAPIContext } from "../../contexts/LiveAPIContext"
 import {
   FunctionDeclaration,
   LiveServerToolCall,
   Modality,
   Type,
-} from "@google/genai";
+} from "@google/genai"
 
 const declaration: FunctionDeclaration = {
   name: "render_altair",
@@ -37,7 +36,7 @@ const declaration: FunctionDeclaration = {
     },
     required: ["json_graph"],
   },
-};
+}
 
 // Tool functions for logging conversation flow
 const conversationTools: FunctionDeclaration[] = [
@@ -61,17 +60,17 @@ const conversationTools: FunctionDeclaration[] = [
   },
   {
     name: "log_question_start",
-    description: "Call this when you START asking a question to the user. This marks the beginning of your question.",
+    description: "Call this when you START asking a question to the user.",
     parameters: {
       type: Type.OBJECT,
       properties: {
         question: {
           type: Type.STRING,
-          description: "The question you are about to ask the user",
+          description: "The question you are about to ask",
         },
         part: {
           type: Type.STRING,
-          description: "Which part of the conversation (e.g., 'Part 1', 'Part 2', 'Part 3')",
+          description: "Which part (e.g., 'Part 1', 'Part 2', 'Part 3')",
         },
       },
       required: ["question"],
@@ -79,7 +78,7 @@ const conversationTools: FunctionDeclaration[] = [
   },
   {
     name: "log_question_end",
-    description: "Call this when you FINISH asking a question to the user. This marks the end of your question.",
+    description: "Call this when you FINISH asking a question to the user.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -93,30 +92,37 @@ const conversationTools: FunctionDeclaration[] = [
   },
   {
     name: "log_ai_response",
-    description: "Call this to log important information about what you're saying or responding to the user.",
+    description: "Call this to log AI responses.",
     parameters: {
       type: Type.OBJECT,
       properties: {
         message: {
           type: Type.STRING,
-          description: "Your response or comment to the user",
+          description: "Your response to the user",
         },
         type: {
           type: Type.STRING,
-          description: "Type of response (e.g., 'feedback', 'question', 'instruction', 'evaluation')",
+          description: "Type of response",
         },
       },
       required: ["message", "type"],
     },
   },
-];
+]
 
-function AltairComponent() {
-  const [jsonString, setJSONString] = useState<string>("");
-  const { client, setConfig, setModel } = useLiveAPIContext();
+/**
+ * Altair Utility Hook - NOT a component
+ * This hook configures the AI, sets up tool handlers, and starts the greeting
+ * Call this hook in your ChatLayout to initialize AI
+ */
+export function useAltairAI() {
+  const { client, setConfig, setModel, connected } = useLiveAPIContext()
+  const [isInitialized, setIsInitialized] = useState(false)
 
+  // Step 1: Configure AI model and system instruction
   useEffect(() => {
-    setModel("gemini-2.5-flash-native-audio-preview-09-2025");
+    console.log("[ALTAIR] Configuring AI model and system instruction")
+    setModel("gemini-2.5-flash-native-audio-preview-09-2025")
     setConfig({
       responseModalities: [Modality.AUDIO],
       speechConfig: {
@@ -150,74 +156,65 @@ CRITICAL INSTRUCTIONS - FOLLOW THESE EXACTLY:
    - Ask IELTS-style questions ONLY
    - Topics: family, work, hobbies, travel, hometown, technology, food, education
    - Use follow-up questions to assess fluency and coherence
-   - Rate responses mentally on: Fluency, Coherence, Vocabulary, Grammar, Pronunciation
+   - Rate responses on: Fluency, Coherence, Vocabulary, Grammar, Pronunciation
 
 4. WORKFLOW:
-   a) START IMMEDIATELY - When connection is established, greet the user and introduce yourself
+   a) START IMMEDIATELY - greet the user and introduce yourself
    b) Log the greeting with log_ai_speech
    c) Begin Part 1 with 4-5 questions
-   d) Log each question and response with log_ai_speech
+   d) Log each question with log_ai_speech
    e) Transition to Part 2 with topic card
-   f) Log Part 2 instructions and feedback with log_ai_speech
+   f) Log Part 2 feedback with log_ai_speech
    g) Conduct Part 3 discussion
    h) Provide final evaluation
 
 IMPORTANT REMINDERS:
-- You are ONLY an IELTS examiner - stay in this role completely
-- Log EVERY piece of text you say - this is mandatory for quality assurance
-- Be professional, friendly, but objective in assessment
-- Don't answer personal questions - redirect to test
-- Keep responses to reasonable length for speaking test
+- You are ONLY an IELTS examiner - stay in role
+- Log EVERY piece of text you say
+- Be professional, friendly, but objective
 - Always respond with audio (speaking)
-- START SPEAKING IMMEDIATELY - DO NOT WAIT FOR USER INPUT
+- START SPEAKING IMMEDIATELY
 
-BEGIN NOW - Greet the user warmly and start the IELTS speaking test immediately. Begin Part 1 by asking them to introduce themselves.`,
+BEGIN NOW - Greet the user warmly and start the IELTS speaking test immediately.`,
           },
         ],
       },
       tools: [
-        // there is a free-tier quota for search
         { googleSearch: {} },
         { functionDeclarations: [declaration, ...conversationTools] },
       ],
-    });
-  }, [setConfig, setModel]);
+    })
+    setIsInitialized(true)
+  }, [setConfig, setModel])
 
+  // Step 2: Set up tool call handlers
   useEffect(() => {
+    if (!isInitialized || !client) return
+
     const onToolCall = (toolCall: LiveServerToolCall) => {
-      if (!toolCall.functionCalls) {
-        return;
-      }
+      if (!toolCall.functionCalls) return
+
+      console.log("[ALTAIR] Received tool calls:", toolCall.functionCalls.map(fc => fc.name))
 
       // Handle conversation logging tools
       toolCall.functionCalls.forEach((fc) => {
-        const args = fc.args as any;
+        const args = fc.args as any
 
         if (fc.name === "log_ai_speech") {
-          console.log(`🤖 AI SPEECH [${args.type?.toUpperCase()}]:`, args.speech);
+          console.log(`🤖 AI SPEECH [${args.type?.toUpperCase()}]:`, args.speech)
         } else if (fc.name === "log_question_start") {
-          console.log('📝 QUESTION START:', args.question);
+          console.log('📝 QUESTION START:', args.question)
           if (args.part) {
-            console.log('   Part:', args.part);
+            console.log('   Part:', args.part)
           }
         } else if (fc.name === "log_question_end") {
-          console.log('✅ QUESTION END:', args.question);
+          console.log('✅ QUESTION END:', args.question)
         } else if (fc.name === "log_ai_response") {
-          console.log(`💬 AI ${args.type?.toUpperCase()}:`, args.message);
+          console.log(`💬 AI ${args.type?.toUpperCase()}:`, args.message)
         }
-      });
+      })
 
-      // Handle render_altair tool
-      const fc = toolCall.functionCalls.find(
-        (fc) => fc.name === declaration.name
-      );
-      if (fc) {
-        const str = (fc.args as any).json_graph;
-        setJSONString(str);
-      }
-
-      // send data for the response of your tool call
-      // in this case Im just saying it was successful
+      // Send success response for all tool calls
       if (toolCall.functionCalls.length) {
         setTimeout(
           () =>
@@ -229,43 +226,44 @@ BEGIN NOW - Greet the user warmly and start the IELTS speaking test immediately.
               })),
             }),
           200
-        );
+        )
       }
-    };
-    client.on("toolcall", onToolCall);
-    return () => {
-      client.off("toolcall", onToolCall);
-    };
-  }, [client]);
-
-  const embedRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (embedRef.current && jsonString) {
-      console.log("jsonString", jsonString);
-      vegaEmbed(embedRef.current, JSON.parse(jsonString));
     }
-  }, [embedRef, jsonString]);
 
-  // Auto-start greeting when component mounts and client is connected
+    console.log("[ALTAIR] Registering tool call handler")
+    client.on("toolcall", onToolCall)
+
+    return () => {
+      console.log("[ALTAIR] Unregistering tool call handler")
+      client.off("toolcall", onToolCall)
+    }
+  }, [client, isInitialized])
+
+  // Step 3: Send initial greeting when connected
   useEffect(() => {
-    const startGreeting = async () => {
-      // Wait a bit for connection to stabilize
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    if (!connected || !isInitialized) return
 
-      // Send initial greeting to start the AI speaking
-      if (client && client.session) {
+    console.log("[ALTAIR] Client connected, waiting to send greeting...")
+
+    const sendGreeting = async () => {
+      // Wait for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      if (client?.session) {
+        console.log("[ALTAIR] Sending initial greeting to start AI")
         client.send([{
-          text: "Hello, I'm ready to begin the IELTS speaking test. Please start speaking."
-        }]);
+          text: "Hello, I'm ready to begin the IELTS speaking test."
+        }])
+      } else {
+        console.log("[ALTAIR] Session not ready yet")
       }
-    };
+    }
 
-    // Only trigger once when component mounts
-    startGreeting();
-  }, [client]);
+    sendGreeting()
+  }, [connected, isInitialized, client])
 
-  return <div className="vega-embed" ref={embedRef} />;
+  return {
+    isInitialized,
+  }
 }
 
-export const Altair = memo(AltairComponent);
